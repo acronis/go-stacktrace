@@ -185,13 +185,8 @@ func (st *StackTrace) Header() string {
 	result := fmt.Sprintf("[%s] %s: %s",
 		st.Severity,
 		st.Type,
-		st.Location,
+		st.GetLocWithPos(),
 	)
-	if st.Position != nil {
-		result = fmt.Sprintf("%s:%d:%d", result, st.Position.Line, st.Position.Column)
-	} else {
-		result = fmt.Sprintf("%s:1", result)
-	}
 	return result
 }
 
@@ -440,6 +435,17 @@ func (st *StackTrace) Clone() *StackTrace {
 	}
 	c := *st
 	return &c
+}
+
+// GetLocWithPos returns the location with position of the StackTrace.
+func (st *StackTrace) GetLocWithPos() string {
+	result := st.Location
+	if st.Position != nil {
+		result = fmt.Sprintf("%s:%d:%d", result, st.Position.Line, st.Position.Column)
+	} else {
+		result = fmt.Sprintf("%s:1", result)
+	}
+	return result
 }
 
 // Position contains the line and column where the error occurred.
