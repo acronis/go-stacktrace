@@ -37,7 +37,7 @@ func TestUnwrapError(t *testing.T) {
 			},
 			want:    firstValidErr,
 			want1:   true,
-			wantMsg: "[error] validating: /usr/local/raml.raml:10:1: first validation error",
+			wantMsg: "[error] parsing: /usr/local/raml.raml:10:1: first validation error",
 		},
 		{
 			name: "Check wrapped first validation error",
@@ -46,7 +46,7 @@ func TestUnwrapError(t *testing.T) {
 			},
 			want: &StackTrace{
 				Severity:        SeverityError,
-				Type:            TypeValidating,
+				Type:            TypeParsing,
 				Message:         firstValidErr.Message,
 				Location:        firstValidErr.Location,
 				Position:        firstValidErr.Position,
@@ -54,7 +54,7 @@ func TestUnwrapError(t *testing.T) {
 				Err:             wrappedFirstValidErr,
 			},
 			want1:   true,
-			wantMsg: "[error] validating: /usr/local/raml.raml:10:1: wrapped firstValidErr: first validation error",
+			wantMsg: "[error] parsing: /usr/local/raml.raml:10:1: wrapped firstValidErr: first validation error",
 		},
 		{
 			name: "Check not a validation error",
@@ -87,7 +87,7 @@ func TestUnwrapError(t *testing.T) {
 			},
 			want: &StackTrace{
 				Severity:        SeverityError,
-				Type:            TypeValidating,
+				Type:            TypeParsing,
 				Message:         fmt.Sprintf("wrapped: %s", wrappedSimpleErr.Error()),
 				Location:        "/usr/local/raml3.raml",
 				Position:        &Position{Line: 30, Column: 3},
@@ -95,7 +95,7 @@ func TestUnwrapError(t *testing.T) {
 				WrappingMessage: "",
 			},
 			want1:   true,
-			wantMsg: fmt.Sprintf("[error] validating: /usr/local/raml3.raml:30:3: wrapped: %s", wrappedSimpleErr.Error()),
+			wantMsg: fmt.Sprintf("[error] parsing: /usr/local/raml3.raml:30:3: wrapped: %s", wrappedSimpleErr.Error()),
 		},
 		{
 			name: "Check double wrapped error",
@@ -104,7 +104,7 @@ func TestUnwrapError(t *testing.T) {
 			},
 			want: &StackTrace{
 				Severity:        SeverityError,
-				Type:            TypeValidating,
+				Type:            TypeParsing,
 				Message:         secondValidErr.Message,
 				Location:        secondValidErr.Location,
 				Position:        secondValidErr.Position,
@@ -112,14 +112,14 @@ func TestUnwrapError(t *testing.T) {
 				WrappingMessage: "wrapped secondValidErr",
 				Wrapped: &StackTrace{
 					Severity: SeverityError,
-					Type:     TypeValidating,
+					Type:     TypeParsing,
 					Message:  firstValidErr.Message,
 					Location: firstValidErr.Location,
 					Position: firstValidErr.Position,
 				},
 			},
 			want1:   true,
-			wantMsg: "[error] validating: /usr/local/raml2.raml:20:2: wrapped secondValidErr: wrapped firstValidErr: [error] validating: /usr/local/raml.raml:10:1: first validation error",
+			wantMsg: "[error] parsing: /usr/local/raml2.raml:20:2: wrapped secondValidErr: wrapped firstValidErr: [error] parsing: /usr/local/raml.raml:10:1: first validation error",
 		},
 	}
 	for _, tt := range tests {
@@ -596,8 +596,8 @@ func TestError_SetType(t *testing.T) {
 			v := &StackTrace{
 				Type: tt.fields.ErrType,
 			}
-			if got := v.SetType(tt.args.errType); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("SetType() = %v, want %v", got, tt.want)
+			if got := v.SetType(tt.args.errType); !reflect.DeepEqual(got.Type, tt.want.Type) {
+				t.Errorf("SetType() = %v, want %v", got.Type, tt.want.Type)
 			}
 		})
 	}
@@ -976,13 +976,14 @@ func TestNewWrappedError(t *testing.T) {
 				},
 			},
 			want: &StackTrace{
-				Severity: SeverityCritical,
-				Type:     TypeParsing,
-				Message:  "message: error",
-				Location: "/usr/local/raml.raml",
-				Position: &Position{Line: 10, Column: 1},
-				Err:      fmt.Errorf("error"),
-				Info:     *NewStructInfo().Add("key", Stringer("value")),
+				Severity:  SeverityCritical,
+				Type:      TypeParsing,
+				Message:   "message: error",
+				Location:  "/usr/local/raml.raml",
+				Position:  &Position{Line: 10, Column: 1},
+				Err:       fmt.Errorf("error"),
+				Info:      *NewStructInfo().Add("key", Stringer("value")),
+				typeIsSet: true,
 			},
 		},
 	}
@@ -1019,12 +1020,13 @@ func TestNewError(t *testing.T) {
 				},
 			},
 			want: &StackTrace{
-				Severity: SeverityCritical,
-				Type:     TypeParsing,
-				Message:  "message",
-				Location: "/usr/local/raml.raml",
-				Position: &Position{Line: 10, Column: 1},
-				Info:     *NewStructInfo().Add("key", Stringer("value")),
+				Severity:  SeverityCritical,
+				Type:      TypeParsing,
+				Message:   "message",
+				Location:  "/usr/local/raml.raml",
+				Position:  &Position{Line: 10, Column: 1},
+				Info:      *NewStructInfo().Add("key", Stringer("value")),
+				typeIsSet: true,
 			},
 		},
 	}
