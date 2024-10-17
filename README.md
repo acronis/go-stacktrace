@@ -31,8 +31,8 @@ import (
 func main() {
     err := stacktrace.New("An error occurred", stacktrace.WithLocation("/path/to/file"), stacktrace.WithPosition(stacktrace.NewPosition(10, 1)))
     fmt.Println(err)
-	// Output:
-	// /path/to/file:10:1: An error occurred
+    // Output:
+    // /path/to/file:10:1: An error occurred
 }
 ```
 
@@ -49,8 +49,8 @@ func main() {
     baseErr := fmt.Errorf("base error")
     wrappedErr := stacktrace.NewWrapped("an error occurred", baseErr, stacktrace.WithLocation("/path/to/file"), stacktrace.WithPosition(stacktrace.NewPosition(10, 1)))
     fmt.Println(wrappedErr)
-	// Output:
-	// /path/to/file:10:1: an error occurred: base error
+    // Output:
+    // /path/to/file:10:1: an error occurred: base error
     
     unwrappedErr, ok := stacktrace.Unwrap(wrappedErr)
     if ok {
@@ -58,8 +58,8 @@ func main() {
     }
     
     wrappedErr2 := stacktrace.Wrap(baseErr, stacktrace.WithLocation("/path/to/file"), stacktrace.WithPosition(stacktrace.NewPosition(10, 1)))
-	fmt.Println(wrappedErr2)
-	// Output:
+    fmt.Println(wrappedErr2)
+    // Output:
     // /path/to/file:10:1: base error
 }
 ```
