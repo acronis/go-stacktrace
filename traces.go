@@ -29,10 +29,10 @@ func WithEnsureDuplicates() TracesOpt {
 }
 
 type Stack struct {
-	LinePos  string
-	Severity Severity
+	LinePos  *string
+	Severity *Severity
 	Message  string
-	Type     Type
+	Type     *Type
 }
 
 func NewStack() *Stack {
@@ -60,13 +60,15 @@ func (st *StackTrace) getTraces(opts *TracesOptions) []Trace {
 
 	trace := NewTrace()
 	stack := NewStack()
-	stack.LinePos = st.GetLocWithPos()
+	stack.LinePos = st.GetLocWithPosPtr()
 	stack.Severity = st.Severity
-	stack.Message = st.FullMessageWithInfo()
+	stack.Message = st.MessageWithInfo()
 	stack.Type = st.Type
 
-	if _, ok := opts.dupLocs[stack.LinePos]; ok {
-		return tracesWithList()
+	if stack.LinePos != nil {
+		if _, ok := opts.dupLocs[*stack.LinePos]; ok {
+			return tracesWithList()
+		}
 	}
 
 	trace.Stack = append(trace.Stack, *stack)
@@ -78,8 +80,8 @@ func (st *StackTrace) getTraces(opts *TracesOptions) []Trace {
 		for i := range wrappedTraces {
 			trace.Stack = append(trace.Stack, wrappedTraces[i].Stack...)
 		}
-	} else if opts.EnsureDuplicates {
-		opts.dupLocs[stack.LinePos] = struct{}{}
+	} else if opts.EnsureDuplicates && stack.LinePos != nil {
+		opts.dupLocs[*stack.LinePos] = struct{}{}
 	}
 
 	traces = append(traces, *trace)
