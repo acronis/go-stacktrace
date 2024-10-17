@@ -1,16 +1,18 @@
-package stacktrace
+package slogex
 
 import (
 	"fmt"
 	"log/slog"
 	"reflect"
 	"testing"
+
+	"github.com/acronis/go-stacktrace"
 )
 
 func TestErrToSlogAttr(t *testing.T) {
 	type args struct {
 		err  error
-		opts []TracesOpt
+		opts []stacktrace.TracesOpt
 	}
 	tests := []struct {
 		name string
@@ -20,8 +22,8 @@ func TestErrToSlogAttr(t *testing.T) {
 		{
 			name: "Test simple",
 			args: args{
-				err:  New("error message", "location.raml"),
-				opts: []TracesOpt{},
+				err:  stacktrace.New("error message", "location.raml"),
+				opts: []stacktrace.TracesOpt{},
 			},
 			want: slog.Group(
 				"tracebacks", "traces", []slog.Attr{
@@ -43,7 +45,7 @@ func TestErrToSlogAttr(t *testing.T) {
 			name: "Test is not a stacktrace",
 			args: args{
 				err:  fmt.Errorf("error message"),
-				opts: []TracesOpt{},
+				opts: []stacktrace.TracesOpt{},
 			},
 			want: slog.String("error", "error message"),
 		},
@@ -51,7 +53,7 @@ func TestErrToSlogAttr(t *testing.T) {
 			name: "Test nil err",
 			args: args{
 				err:  nil,
-				opts: []TracesOpt{},
+				opts: []stacktrace.TracesOpt{},
 			},
 			want: slog.Attr{},
 		},

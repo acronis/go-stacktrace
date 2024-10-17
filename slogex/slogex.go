@@ -1,16 +1,18 @@
-package stacktrace
+package slogex
 
 import (
 	"fmt"
 	"log/slog"
+
+	"github.com/acronis/go-stacktrace"
 )
 
-func ErrToSlogAttr(err error, opts ...TracesOpt) slog.Attr {
+func ErrToSlogAttr(err error, opts ...stacktrace.TracesOpt) slog.Attr {
 	if err == nil {
 		return slog.Attr{}
 	}
 
-	st, ok := Unwrap(err)
+	st, ok := stacktrace.Unwrap(err)
 	if !ok {
 		return slog.String("error", err.Error())
 	}
