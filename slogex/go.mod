@@ -1,4 +1,4 @@
-module slogex
+module github.com/acronis/go-stacktrace/slogex
 
 go 1.22.6
 
