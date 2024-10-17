@@ -22,7 +22,11 @@ func TestErrToSlogAttr(t *testing.T) {
 		{
 			name: "Test simple",
 			args: args{
-				err:  stacktrace.New("error message", "location.raml"),
+				err: stacktrace.New("error message",
+					stacktrace.WithLocation("location.raml"),
+					stacktrace.WithSeverity("error"),
+					stacktrace.WithType("parsing"),
+				),
 				opts: []stacktrace.TracesOpt{},
 			},
 			want: slog.Group(

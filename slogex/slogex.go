@@ -32,10 +32,20 @@ func ErrToSlogAttr(err error, opts ...stacktrace.TracesOpt) slog.Attr {
 			key := fmt.Sprintf("%d", stackIndex)
 			stackAttr := slog.Group(
 				key,
-				slog.String("type", string(stack.Type)),
-				slog.String("severity", string(stack.Severity)),
-				slog.String("position", stack.LinePos),
-				slog.String("message", stack.Message),
+				func() []any {
+					attrs := []any{}
+					if stack.Type != nil {
+						attrs = append(attrs, slog.String("type", stack.Type.String()))
+					}
+					if stack.Severity != nil {
+						attrs = append(attrs, slog.String("severity", stack.Severity.String()))
+					}
+					if stack.LinePos != nil {
+						attrs = append(attrs, slog.String("position", *stack.LinePos))
+					}
+					attrs = append(attrs, slog.String("message", stack.Message))
+					return attrs
+				}()...,
 			)
 			stackAttrs = append(stackAttrs, stackAttr)
 		}
