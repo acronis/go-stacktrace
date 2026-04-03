@@ -23,13 +23,15 @@ func ErrToSlogAttr(err error, opts ...stacktrace.TracesOpt) slog.Attr {
 
 	tracebacks := st.GetTraces(opts...)
 
+	tracebackWidth := len(fmt.Sprintf("%d", len(tracebacks)))
 	tracebackAttrs := make([]slog.Attr, 0, len(tracebacks))
 	for traceIndex := range tracebacks {
 		traceback := tracebacks[traceIndex]
+		stackWidth := len(fmt.Sprintf("%d", len(traceback.Stack)))
 		stackAttrs := make([]slog.Attr, 0, len(traceback.Stack))
 		for stackIndex := range traceback.Stack {
 			stack := traceback.Stack[stackIndex]
-			key := fmt.Sprintf("%d", stackIndex)
+			key := fmt.Sprintf("%0*d", stackWidth, stackIndex)
 			stackAttr := slog.Group(
 				key,
 				func() []any {
@@ -49,7 +51,7 @@ func ErrToSlogAttr(err error, opts ...stacktrace.TracesOpt) slog.Attr {
 			)
 			stackAttrs = append(stackAttrs, stackAttr)
 		}
-		tracebackAttr := slog.Group(fmt.Sprintf("%d", traceIndex), "stack", stackAttrs)
+		tracebackAttr := slog.Group(fmt.Sprintf("%0*d", tracebackWidth, traceIndex), "stack", stackAttrs)
 		tracebackAttrs = append(tracebackAttrs, tracebackAttr)
 	}
 
