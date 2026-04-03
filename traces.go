@@ -77,14 +77,22 @@ func (st *StackTrace) getTraces(opts *TracesOptions) []Trace {
 		if len(wrappedTraces) == 0 {
 			return tracesWithList()
 		}
-		for i := range wrappedTraces {
-			trace.Stack = append(trace.Stack, wrappedTraces[i].Stack...)
+		for _, wt := range wrappedTraces {
+			combined := Trace{Stack: make([]Stack, len(trace.Stack), len(trace.Stack)+len(wt.Stack))}
+			copy(combined.Stack, trace.Stack)
+			combined.Stack = append(combined.Stack, wt.Stack...)
+			traces = append(traces, combined)
 		}
-	} else if opts.EnsureDuplicates && stack.LinePos != nil {
-		opts.dupLocs[*stack.LinePos] = struct{}{}
+	} else {
+		if opts.EnsureDuplicates && stack.LinePos != nil {
+			opts.dupLocs[*stack.LinePos] = struct{}{}
+		}
+		// Suppress standalone emission for locationless container nodes (no LinePos,
+		// non-empty List): they are pure grouping headers, not actionable errors.
+		if stack.LinePos != nil || len(st.List) == 0 {
+			traces = append(traces, *trace)
+		}
 	}
-
-	traces = append(traces, *trace)
 
 	return tracesWithList()
 }
