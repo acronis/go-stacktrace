@@ -1546,6 +1546,33 @@ func TestStackTrace_Append(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:   "Duplicate entry is dropped",
+			fields: fields{},
+			args: args{
+				e: &StackTrace{Message: "duplicate"},
+			},
+			want: func(t *testing.T, got *StackTrace) {
+				// Append the same logical entry a second time.
+				got = got.Append(&StackTrace{Message: "duplicate"})
+				if len(got.List) != 1 {
+					t.Errorf("Append() duplicate: got %d entries, want 1", len(got.List))
+				}
+			},
+		},
+		{
+			name:   "Different messages at same position are both kept",
+			fields: fields{},
+			args: args{
+				e: &StackTrace{Message: "first error"},
+			},
+			want: func(t *testing.T, got *StackTrace) {
+				got = got.Append(&StackTrace{Message: "second error"})
+				if len(got.List) != 2 {
+					t.Errorf("Append() distinct: got %d entries, want 2", len(got.List))
+				}
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1659,5 +1686,95 @@ func Test_optErrNodePosition_Apply(t *testing.T) {
 				tt.want(t, tt.args.e)
 			}
 		})
+	}
+}
+
+func TestAppend_MaxList(t *testing.T) {
+	prev := MaxList
+	MaxList = 3
+	defer func() { MaxList = prev }()
+
+	st := New("root")
+	for i := 0; i < 10; i++ {
+		st = st.Append(New(fmt.Sprintf("entry %d", i)))
+	}
+	// Expect MaxList real entries + 1 sentinel = MaxList+1 total.
+	if len(st.List) != MaxList+1 {
+		t.Errorf("Append() with MaxList=3: got %d entries, want %d", len(st.List), MaxList+1)
+	}
+	last := st.List[len(st.List)-1]
+	if last.Message != TooManyErrorsMsg {
+		t.Errorf("Append() sentinel message = %q, want %q", last.Message, TooManyErrorsMsg)
+	}
+}
+
+func TestWrap_MaxDepth(t *testing.T) {
+	prev := MaxDepth
+	MaxDepth = 3
+	defer func() { MaxDepth = prev }()
+
+	// Build a chain longer than MaxDepth; the excess should become a sentinel.
+	inner := New("d3")
+	inner = New("d2").Wrap(inner)
+	inner = New("d1").Wrap(inner)  // inner.depth == 2 < MaxDepth, allowed
+	outer := New("d0").Wrap(inner) // inner.depth == 2 < 3, allowed; outer.depth == 3
+
+	// A further wrap should replace the chain with a sentinel that carries the
+	// deepest reachable message ("d3") rather than only ChainTruncatedMsg.
+	top := New("top").Wrap(outer)
+	if top.Wrapped == nil {
+		t.Fatal("Wrap() expected sentinel Wrapped, got nil")
+	}
+	if top.Wrapped.Message != "d3" {
+		t.Errorf("Wrap() sentinel message = %q, want %q (deepest message)", top.Wrapped.Message, "d3")
+	}
+}
+
+func TestWrap_MaxDepth_EmptyDeepest(t *testing.T) {
+	prev := MaxDepth
+	MaxDepth = 3
+	defer func() { MaxDepth = prev }()
+
+	// If the deepest node has no message, fall back to ChainTruncatedMsg.
+	inner := New("")
+	inner = New("").Wrap(inner)
+	inner = New("").Wrap(inner)
+	outer := New("").Wrap(inner)
+
+	top := New("top").Wrap(outer)
+	if top.Wrapped == nil {
+		t.Fatal("Wrap() expected sentinel Wrapped, got nil")
+	}
+	if top.Wrapped.Message != ChainTruncatedMsg {
+		t.Errorf("Wrap() sentinel message = %q, want %q", top.Wrapped.Message, ChainTruncatedMsg)
+	}
+}
+
+func TestWrap_MaxDepth_PreservesLocationAndPosition(t *testing.T) {
+	prev := MaxDepth
+	MaxDepth = 3
+	defer func() { MaxDepth = prev }()
+
+	loc := Location("/tmp/real.raml")
+	pos := &Position{Line: 42, Column: 7}
+
+	inner := New("root cause", WithLocation(string(loc)), WithPosition(pos))
+	inner = New("w2").Wrap(inner)
+	inner = New("w1").Wrap(inner)
+	outer := New("w0").Wrap(inner)
+
+	top := New("top").Wrap(outer)
+	if top.Wrapped == nil {
+		t.Fatal("expected sentinel")
+	}
+	s := top.Wrapped
+	if s.Message != "root cause" {
+		t.Errorf("sentinel message = %q, want %q", s.Message, "root cause")
+	}
+	if s.Location == nil || *s.Location != loc {
+		t.Errorf("sentinel location = %v, want %v", s.Location, loc)
+	}
+	if s.Position == nil || s.Position.Line != 42 {
+		t.Errorf("sentinel position = %v, want line 42", s.Position)
 	}
 }

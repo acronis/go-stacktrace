@@ -175,6 +175,24 @@ func (loc *Location) String() string {
 	return string(*loc)
 }
 
+// MaxList is the maximum number of entries allowed in a StackTrace's List.
+// When the limit is reached, a sentinel entry is appended and further entries
+// are dropped. A value of 0 means unlimited.
+var MaxList = 10
+
+// MaxDepth is the maximum Wrapped-chain depth. When the incoming node's depth
+// equals or exceeds this limit, the chain is replaced by a sentinel leaf.
+// A value of 0 means unlimited.
+var MaxDepth = 2000
+
+// TooManyErrorsMsg is the message of the sentinel entry added to List when
+// MaxList is exceeded. Callers can test for this to detect truncation.
+const TooManyErrorsMsg = "too many errors, some have been omitted"
+
+// ChainTruncatedMsg is the message of the sentinel leaf substituted for the
+// Wrapped chain when MaxDepth is exceeded.
+const ChainTruncatedMsg = "error chain truncated"
+
 // StackTrace contains information about a parser error.
 type StackTrace struct {
 	// Severity is the severity of the error.
@@ -199,6 +217,8 @@ type StackTrace struct {
 	List []*StackTrace
 
 	typeIsSet bool
+	// depth is the length of the Wrapped chain rooted at this node (0 = leaf).
+	depth int
 }
 
 // Header returns the header of the StackTrace.
@@ -476,16 +496,89 @@ func (st *StackTrace) SetErr(err error) *StackTrace {
 	return st
 }
 
-// Wrap wraps the given StackTrace and returns it
+// Wrap wraps the given StackTrace and returns it.
+// If MaxDepth > 0 and w's chain depth already equals or exceeds MaxDepth,
+// the chain is replaced by a sentinel leaf that carries the message, location,
+// and position of the deepest reachable node so the caller still sees the
+// root cause rather than only ChainTruncatedMsg.
 func (st *StackTrace) Wrap(w *StackTrace) *StackTrace {
+	if w == nil {
+		return st
+	}
+	if MaxDepth > 0 && w.depth >= MaxDepth {
+		sentinel := &StackTrace{Message: ChainTruncatedMsg}
+		if deepest := deepestWrapped(w); deepest != nil && deepest.Message != "" {
+			sentinel.Message = deepest.Message
+			sentinel.Location = deepest.Location
+			sentinel.Position = deepest.Position
+		}
+		st.Wrapped = sentinel
+		st.depth = 1
+		return st
+	}
 	st.Wrapped = w
+	st.depth = w.depth + 1
 	return st
 }
 
-// Append adds the given StackTrace to the list of StackTraces and returns it
+// deepestWrapped returns the last node reachable by following Wrapped links.
+func deepestWrapped(st *StackTrace) *StackTrace {
+	for st.Wrapped != nil {
+		st = st.Wrapped
+	}
+	return st
+}
+
+// sameFingerprint reports whether two nodes share the same (location, position,
+// message, info) identity for deduplication purposes.
+// Checks are ordered cheapest-first so the common non-matching case short-circuits
+// before reaching Info.String(), which is the only allocation.
+func (st *StackTrace) sameFingerprint(o *StackTrace) bool {
+	if st.Message != o.Message {
+		return false
+	}
+	switch {
+	case st.Location == nil && o.Location == nil:
+	case st.Location == nil || o.Location == nil:
+		return false
+	case *st.Location != *o.Location:
+		return false
+	}
+	switch {
+	case st.Position == nil && o.Position == nil:
+	case st.Position == nil || o.Position == nil:
+		return false
+	case st.Position.Line != o.Position.Line || st.Position.Column != o.Position.Column:
+		return false
+	}
+	if len(st.Info.info) == 0 && len(o.Info.info) == 0 {
+		return true
+	}
+	return st.Info.String() == o.Info.String()
+}
+
+// Append adds the given StackTrace to the list of StackTraces and returns it.
+// Duplicate entries — those whose (location, position, message, info) fingerprint
+// matches an existing entry — are silently dropped.
+// When MaxList > 0 and the list is full, a TooManyErrorsMsg sentinel is appended
+// in place of the new entry and all subsequent entries are dropped.
 func (st *StackTrace) Append(e *StackTrace) *StackTrace {
+	if MaxList > 0 && len(st.List) > MaxList {
+		// Sentinel already placed; drop silently.
+		return st
+	}
+	for _, existing := range st.List {
+		if existing.sameFingerprint(e) {
+			return st
+		}
+	}
 	if st.List == nil {
 		st.List = make([]*StackTrace, 0)
+	}
+	if MaxList > 0 && len(st.List) == MaxList {
+		// Capacity reached: replace with sentinel and stop.
+		st.List = append(st.List, &StackTrace{Message: TooManyErrorsMsg})
+		return st
 	}
 	st.List = append(st.List, e)
 	return st
@@ -514,8 +607,10 @@ func (st *StackTrace) GetLocWithPosPtr() *string {
 
 // Position contains the line and column where the error occurred.
 type Position struct {
-	Line   int
-	Column int
+	Line      int
+	Column    int
+	EndLine   int
+	EndColumn int // 1-based exclusive (column after the last character); when set, used to construct a multi-character LSP range
 }
 
 func (p *Position) String() string {
@@ -535,6 +630,39 @@ func (p *Position) String() string {
 // NewPosition creates a new position with the given line and column.
 func NewPosition(line, column int) *Position {
 	return &Position{Line: line, Column: column}
+}
+
+// Accumulator collects multiple *StackTrace errors into a single List-bearing
+// root node. The zero value is ready to use without any initialization.
+//
+// It replaces the repetitive nil-check-then-Append pattern:
+//
+//	var acc stacktrace.Accumulator
+//	for _, item := range items {
+//		if err := process(item); err != nil {
+//			acc.Add(stacktrace.NewWrapped("step", err))
+//		}
+//	}
+//	return acc.Result()
+type Accumulator struct {
+	head *StackTrace
+}
+
+// Add appends st to the accumulator. A nil st is ignored.
+func (a *Accumulator) Add(st *StackTrace) {
+	if st == nil {
+		return
+	}
+	if a.head == nil {
+		a.head = st
+	} else {
+		a.head = a.head.Append(st)
+	}
+}
+
+// Result returns the accumulated StackTrace, or nil when no errors were added.
+func (a *Accumulator) Result() *StackTrace {
+	return a.head
 }
 
 // optErrNodePosition is an option to set the position of the error to the position of the given node.

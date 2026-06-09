@@ -59,13 +59,13 @@ func TestStackTrace_GetTraces(t *testing.T) {
 				Severity: &SeverityError,
 				Type:     &TypeValidating,
 				Location: func() *Location { s := Location("/tmp/location.raml"); return &s }(),
-				Position: &Position{1, 2},
+				Position: &Position{Line: 1, Column: 2},
 				Message:  "error message",
 				Wrapped: &StackTrace{
 					Severity: &SeverityCritical,
 					Type:     &TypeParsing,
 					Location: func() *Location { s := Location("/tmp/location2.raml"); return &s }(),
-					Position: &Position{3, 4},
+					Position: &Position{Line: 3, Column: 4},
 					Message:  "error message 2",
 				},
 			},
@@ -94,13 +94,13 @@ func TestStackTrace_GetTraces(t *testing.T) {
 				Severity: &SeverityError,
 				Type:     &TypeValidating,
 				Location: func() *Location { s := Location("/tmp/location.raml"); return &s }(),
-				Position: &Position{1, 2},
+				Position: &Position{Line: 1, Column: 2},
 				Message:  "error message",
 				Wrapped: &StackTrace{
 					Severity: &SeverityCritical,
 					Type:     &TypeParsing,
 					Location: func() *Location { s := Location("/tmp/location2.raml"); return &s }(),
-					Position: &Position{3, 4},
+					Position: &Position{Line: 3, Column: 4},
 					Message:  "error message 2",
 				},
 				List: []*StackTrace{
@@ -108,13 +108,13 @@ func TestStackTrace_GetTraces(t *testing.T) {
 						Severity: &SeverityCritical,
 						Type:     &TypeParsing,
 						Location: func() *Location { s := Location("/tmp/location2.raml"); return &s }(),
-						Position: &Position{5, 6},
+						Position: &Position{Line: 5, Column: 6},
 						Message:  "error message 3",
 						Wrapped: &StackTrace{
 							Severity: &SeverityCritical,
 							Type:     &TypeParsing,
 							Location: func() *Location { s := Location("/tmp/location2.raml"); return &s }(), // duplicate location
-							Position: &Position{3, 4},                                                        // duplicate position
+							Position: &Position{Line: 3, Column: 4},                                                        // duplicate position
 							Message:  "error message 4",
 						},
 					},
@@ -150,21 +150,21 @@ func TestStackTrace_GetTraces(t *testing.T) {
 				Severity: &SeverityError,
 				Type:     &TypeValidating,
 				Location: func() *Location { s := Location("/tmp/location.raml"); return &s }(),
-				Position: &Position{1, 2},
+				Position: &Position{Line: 1, Column: 2},
 				Message:  "error message",
 				List: []*StackTrace{
 					{
 						Severity: &SeverityCritical,
 						Type:     &TypeParsing,
 						Location: func() *Location { s := Location("/tmp/location2.raml"); return &s }(),
-						Position: &Position{3, 4},
+						Position: &Position{Line: 3, Column: 4},
 						Message:  "error message 2",
 					},
 					{
 						Severity: &SeverityCritical,
 						Type:     &TypeParsing,
 						Location: func() *Location { s := Location("/tmp/location3.raml"); return &s }(),
-						Position: &Position{5, 6},
+						Position: &Position{Line: 5, Column: 6},
 						Message:  "error message 3",
 					},
 				},
